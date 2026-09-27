@@ -1,0 +1,15 @@
+{
+  "name": "BroNet",
+  "short_name": "BroNet",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#2c2f33",
+  "theme_color": "#7289da",
+  "icons": [
+    {
+      "src": "/static/logo.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
