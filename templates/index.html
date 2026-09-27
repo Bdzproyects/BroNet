@@ -8,17 +8,15 @@
     <link rel="icon" href="/static/logo.png" type="image/png">
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #2c2f33; color: white; margin: 0; display: flex; height: 100vh; overflow: hidden; }
-        #sidebar { width: 260px; background: #23272a; padding: 20px; border-right: 1px solid #444; flex-shrink: 0; }
+        #sidebar { width: 280px; background: #23272a; padding: 20px; border-right: 1px solid #444; flex-shrink: 0; }
         #main { flex-grow: 1; padding: 20px; background: #36393f; display: flex; flex-direction: column; overflow-y: auto; }
         .tab-content { display: none; }
         .active { display: block; }
         .btn { background: #7289da; color: white; border: none; padding: 12px; border-radius: 5px; cursor: pointer; width: 100%; margin-bottom: 12px; font-weight: bold; }
-        .btn:hover { background: #5b6eae; }
-        #chat-box { background: #2f3136; height: 400px; overflow-y: auto; padding: 15px; border-radius: 8px; border: 1px solid #444; }
+        #chat-box { background: #2f3136; height: 450px; overflow-y: auto; padding: 15px; border-radius: 8px; border: 1px solid #444; }
         input, textarea { width: 100%; padding: 12px; background: #40444b; color: white; border: none; border-radius: 5px; box-sizing: border-box; margin-bottom: 10px; }
-        .profile-img { width: 60px; height: 60px; border-radius: 50%; object-fit: cover; border: 2px solid #7289da; }
-        .online-dot { width: 10px; height: 10px; background: #43b581; border-radius: 50%; display: inline-block; margin-right: 5px; }
-        .offline-dot { width: 10px; height: 10px; background: #747f8d; border-radius: 50%; display: inline-block; margin-right: 5px; }
+        .profile-img { width: 70px; height: 70px; border-radius: 50%; object-fit: cover; border: 2px solid #7289da; }
+        .online-dot { width: 10px; height: 10px; background: #43b581; border-radius: 50%; display: inline-block; }
         #login-overlay { position: fixed; inset: 0; background: #23272a; z-index: 1000; display: flex; flex-direction: column; align-items: center; justify-content: center; }
         .hidden { display: none !important; }
     </style>
@@ -26,7 +24,7 @@
 <body>
 
 <div id="login-overlay">
-    <h2 style="color: #7289da;">📡 Conectar a BroNet</h2>
+    <h2 style="color: #7289da;">📡 Sistema de Arquitectos</h2>
     <div style="width: 320px;">
         <input type="text" id="u-in" placeholder="Usuario">
         <input type="text" id="e-in" placeholder="Email @gmail.com">
@@ -36,9 +34,9 @@
 </div>
 
 <div id="sidebar">
-    <div style="text-align:center; margin-bottom:20px;">
+    <div style="text-align:center; margin-bottom:20px; background:#2f3136; padding:10px; border-radius:10px;">
         <img id="my-pic" src="/static/logo.png" class="profile-img">
-        <p id="my-name" style="font-weight:bold;">Arquitecto</p>
+        <p id="my-name">...</p>
     </div>
     <button class="btn" onclick="showTab('perfil')">👤 Mi Perfil</button>
     <button class="btn" onclick="showTab('bros')">👥 Lista de Bros</button>
@@ -47,41 +45,38 @@
 </div>
 
 <div id="main">
-    <!-- Pestaña Perfil -->
     <div id="perfil-tab" class="tab-content active">
-        <h3>Mi Perfil</h3>
+        <h3>Editar Mi Arquitectura</h3>
         <input type="file" id="file-pic">
-        <textarea id="bio-in" placeholder="Tu biografía..."></textarea>
+        <textarea id="bio-in" placeholder="Dile algo al mundo..."></textarea>
         <button class="btn" onclick="updateProfile()">Guardar Cambios</button>
     </div>
 
-    <!-- Pestaña Bros y Grupos -->
     <div id="bros-tab" class="tab-content">
         <h3>Bros Registrados</h3>
         <div id="u-list"></div>
-        <button class="btn" style="background:#f04747; margin-top:20px;" onclick="createGroup()">Crear Grupo con Seleccionados</button>
+        <hr>
+        <button class="btn" onclick="alert('Funcionalidad de Grupo en desarrollo...')">Crear Grupo con Seleccionados</button>
     </div>
 
-    <!-- Pestaña Chat -->
     <div id="chat-tab" class="tab-content">
         <h3 id="c-title">Selecciona un Bro</h3>
         <div id="chat-box"></div>
-        <p id="typing-msg" style="font-size:0.8em; color:#aaa; height:20px;"></p>
+        <p id="typing-msg" style="font-size:0.8em; color:#aaa;"></p>
         <input type="text" id="m-in" placeholder="Mensaje..." oninput="sendTyping()">
     </div>
 
-    <!-- Pestaña Brols -->
     <div id="brols-tab" class="tab-content">
-        <h3>🔥 Brols - Feed TikTok</h3>
-        <input type="file" id="brol-file">
-        <button class="btn" onclick="uploadBrol()">Subir nuevo Brol</button>
+        <h3>🔥 Brols - El Feed de Anas</h3>
+        <input type="file" id="brol-file" accept="video/*">
+        <button class="btn" onclick="uploadBrol()">Subir Brol</button>
         <div id="v-list"></div>
     </div>
 </div>
 
 <script>
     const socket = io();
-    let me = {}, target = "", typingTimeout;
+    let me = {}, target = "", tOut;
 
     async function login() {
         const res = await fetch('/login', {
@@ -94,7 +89,7 @@
             me = data.user;
             document.getElementById('login-overlay').classList.add('hidden');
             document.getElementById('my-name').innerText = me.username;
-            document.getElementById('my-pic').src = me.pic + "?t=" + Date.now(); // Cache bust
+            document.getElementById('my-pic').src = me.pic;
             socket.emit('set_identity', {user: me.username});
             loadUsers();
         } else alert(data.msg);
@@ -110,7 +105,7 @@
         if(res.ok) {
             me = data.user;
             document.getElementById('my-pic').src = me.pic + "?t=" + Date.now();
-            alert("Perfil actualizado.");
+            alert("Perímetro actualizado.");
         }
     }
 
@@ -119,8 +114,8 @@
         const users = await res.json();
         document.getElementById('u-list').innerHTML = users.filter(u => u.username !== me.username).map(u => `
             <div style="display:flex; justify-content:space-between; margin-bottom:10px; background:#2f3136; padding:10px; border-radius:5px;">
-                <span><input type="checkbox" class="grp-check" value="${u.username}"> ${u.online ? '<span class="online-dot"></span>' : '<span class="offline-dot"></span>'} ${u.username}</span>
-                <button class="btn" style="width:auto; padding:5px 10px;" onclick="startChat('${u.username}')">Chat</button>
+                <span>${u.online ? '<span class="online-dot"></span>' : ''} 👤 ${u.username}</span>
+                <button class="btn" style="width:auto; padding:5px 10px;" onclick="startChat('${u.username}')">Chatear</button>
             </div>`).join('');
     }
 
@@ -135,19 +130,18 @@
             });
     }
 
-    function sendTyping() {
-        socket.emit('typing', {user: me.username, target: target});
-    }
+    function sendTyping() { socket.emit('typing', {user: me.username, target: target}); }
 
     socket.on('is_typing', d => {
-        document.getElementById('typing-msg').innerText = d.user + " está escribiendo...";
-        clearTimeout(typingTimeout);
-        typingTimeout = setTimeout(() => document.getElementById('typing-msg').innerText = "", 2000);
+        document.getElementById('typing-msg').innerText = d.user + " está pensando...";
+        clearTimeout(tOut);
+        tOut = setTimeout(() => document.getElementById('typing-msg').innerText = "", 2000);
     });
 
     socket.on('new_msg', data => {
-        document.getElementById('chat-box').innerHTML += `<p><strong>${data.user}:</strong> ${data.msg}</p>`;
-        document.getElementById('chat-box').scrollTop = document.getElementById('chat-box').scrollHeight;
+        const b = document.getElementById('chat-box');
+        b.innerHTML += `<p><strong>${data.user}:</strong> ${data.msg}</p>`;
+        b.scrollTop = b.scrollHeight;
     });
 
     document.getElementById('m-in').onkeypress = (e) => {
@@ -169,7 +163,7 @@
         const brols = await res.json();
         document.getElementById('v-list').innerHTML = brols.map(v => `
             <div style="margin-bottom:20px; background:#202225; padding:15px; border-radius:10px;">
-                <p><strong>${v.title}</strong></p>
+                <p><strong>Brol: ${v.title}</strong></p>
                 <video width="100%" controls src="${v.url}"></video>
             </div>`).join('');
     }
