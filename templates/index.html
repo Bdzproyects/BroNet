@@ -2,22 +2,23 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>BroNet - Arquitectura Anas</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
     <link rel="manifest" href="/static/manifest.json">
     <link rel="icon" href="/static/logo.png" type="image/png">
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #2c2f33; color: white; margin: 0; display: flex; height: 100vh; overflow: hidden; }
-        #sidebar { width: 240px; background: #23272a; padding: 20px; border-right: 1px solid #444; flex-shrink: 0; }
+        #sidebar { width: 260px; background: #23272a; padding: 20px; border-right: 1px solid #444; flex-shrink: 0; }
         #main { flex-grow: 1; padding: 20px; background: #36393f; display: flex; flex-direction: column; overflow-y: auto; }
         .tab-content { display: none; }
         .active { display: block; }
         .btn { background: #7289da; color: white; border: none; padding: 12px; border-radius: 5px; cursor: pointer; width: 100%; margin-bottom: 12px; font-weight: bold; }
-        .btn-chat { background: #43b581; width: auto; padding: 5px 15px; }
-        #chat-box { background: #2f3136; height: 450px; overflow-y: auto; padding: 15px; border-radius: 8px; border: 1px solid #444; margin-bottom: 15px; }
+        .btn:hover { background: #5b6eae; }
+        #chat-box { background: #2f3136; height: 400px; overflow-y: auto; padding: 15px; border-radius: 8px; border: 1px solid #444; }
         input, textarea { width: 100%; padding: 12px; background: #40444b; color: white; border: none; border-radius: 5px; box-sizing: border-box; margin-bottom: 10px; }
-        .profile-img { width: 80px; height: 80px; border-radius: 50%; object-fit: cover; border: 3px solid #7289da; }
+        .profile-img { width: 60px; height: 60px; border-radius: 50%; object-fit: cover; border: 2px solid #7289da; }
+        .online-dot { width: 10px; height: 10px; background: #43b581; border-radius: 50%; display: inline-block; margin-right: 5px; }
+        .offline-dot { width: 10px; height: 10px; background: #747f8d; border-radius: 50%; display: inline-block; margin-right: 5px; }
         #login-overlay { position: fixed; inset: 0; background: #23272a; z-index: 1000; display: flex; flex-direction: column; align-items: center; justify-content: center; }
         .hidden { display: none !important; }
     </style>
@@ -25,141 +26,152 @@
 <body>
 
 <div id="login-overlay">
-    <h2 style="color: #7289da;">📡 Bienvenido a BroNet</h2>
+    <h2 style="color: #7289da;">📡 Conectar a BroNet</h2>
     <div style="width: 320px;">
-        <input type="text" id="u-in" placeholder="Usuario o Correo">
-        <input type="text" id="e-in" placeholder="Email @gmail.com (Solo si eres nuevo)">
+        <input type="text" id="u-in" placeholder="Usuario">
+        <input type="text" id="e-in" placeholder="Email @gmail.com">
         <input type="password" id="p-in" placeholder="Contraseña">
         <button onclick="login()" class="btn" style="background: #43b581;">ENTRAR / REGISTRARSE</button>
     </div>
 </div>
 
 <div id="sidebar">
-    <div style="text-align:center; margin-bottom:20px; padding:10px; background:#2f3136; border-radius:10px;">
-        <img id="my-pic" src="/static/logo.png" class="profile-img" style="width:60px; height:60px;">
-        <p id="my-name" style="font-weight:bold; margin-top:5px;">Cargando...</p>
+    <div style="text-align:center; margin-bottom:20px;">
+        <img id="my-pic" src="/static/logo.png" class="profile-img">
+        <p id="my-name" style="font-weight:bold;">Arquitecto</p>
     </div>
     <button class="btn" onclick="showTab('perfil')">👤 Mi Perfil</button>
-    <button class="btn" onclick="showTab('bros')">👥 Buscar Bros</button>
-    <button class="btn" onclick="showTab('chat')">💬 Chat Activo</button>
-    <button class="btn" onclick="showTab('brols')">🔥 Brols</button>
+    <button class="btn" onclick="showTab('bros')">👥 Lista de Bros</button>
+    <button class="btn" onclick="showTab('chat')">💬 Chat</button>
+    <button class="btn" onclick="showTab('brols')">🔥 Brols (TikTok)</button>
 </div>
 
 <div id="main">
-    <!-- Mi Perfil -->
+    <!-- Pestaña Perfil -->
     <div id="perfil-tab" class="tab-content active">
-        <h3>Configurar mi Perfil</h3>
+        <h3>Mi Perfil</h3>
         <input type="file" id="file-pic">
-        <textarea id="bio-in" rows="4" placeholder="Cuéntale algo a tus Bros..."></textarea>
-        <button class="btn" onclick="updateProfile()" style="background:#43b581;">Guardar Cambios</button>
+        <textarea id="bio-in" placeholder="Tu biografía..."></textarea>
+        <button class="btn" onclick="updateProfile()">Guardar Cambios</button>
     </div>
 
-    <!-- Lista de Bros -->
+    <!-- Pestaña Bros y Grupos -->
     <div id="bros-tab" class="tab-content">
-        <h3>Bros en línea</h3>
+        <h3>Bros Registrados</h3>
         <div id="u-list"></div>
+        <button class="btn" style="background:#f04747; margin-top:20px;" onclick="createGroup()">Crear Grupo con Seleccionados</button>
     </div>
 
-    <!-- Chat -->
+    <!-- Pestaña Chat -->
     <div id="chat-tab" class="tab-content">
         <h3 id="c-title">Selecciona un Bro</h3>
         <div id="chat-box"></div>
-        <input type="text" id="m-in" placeholder="Mensaje seguro...">
+        <p id="typing-msg" style="font-size:0.8em; color:#aaa; height:20px;"></p>
+        <input type="text" id="m-in" placeholder="Mensaje..." oninput="sendTyping()">
     </div>
 
-    <!-- Brols -->
+    <!-- Pestaña Brols -->
     <div id="brols-tab" class="tab-content">
-        <h3>🔥 Brols - Tendencias</h3>
+        <h3>🔥 Brols - Feed TikTok</h3>
+        <input type="file" id="brol-file">
+        <button class="btn" onclick="uploadBrol()">Subir nuevo Brol</button>
         <div id="v-list"></div>
     </div>
 </div>
 
 <script>
     const socket = io();
-    let me = {}, target = "";
+    let me = {}, target = "", typingTimeout;
 
     async function login() {
-        const u = document.getElementById('u-in').value;
-        const e = document.getElementById('e-in').value;
-        const p = document.getElementById('p-in').value;
         const res = await fetch('/login', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({username: u, email: e, password: p})
+            body: JSON.stringify({username: document.getElementById('u-in').value, email: document.getElementById('e-in').value, password: document.getElementById('p-in').value})
         });
         const data = await res.json();
         if(res.ok) {
             me = data.user;
             document.getElementById('login-overlay').classList.add('hidden');
             document.getElementById('my-name').innerText = me.username;
-            document.getElementById('my-pic').src = me.pic;
-            document.getElementById('bio-in').value = me.bio;
-        } else { alert(data.msg); }
+            document.getElementById('my-pic').src = me.pic + "?t=" + Date.now(); // Cache bust
+            socket.emit('set_identity', {user: me.username});
+            loadUsers();
+        } else alert(data.msg);
     }
 
     async function updateProfile() {
         const fd = new FormData();
         fd.append('username', me.username);
         fd.append('bio', document.getElementById('bio-in').value);
-        const fileIn = document.getElementById('file-pic');
-        if(fileIn.files) fd.append('file', fileIn.files);
-        
+        if(document.getElementById('file-pic').files) fd.append('file', document.getElementById('file-pic').files);
         const res = await fetch('/update_profile', { method: 'POST', body: fd });
         const data = await res.json();
         if(res.ok) {
             me = data.user;
-            document.getElementById('my-pic').src = me.pic;
-            alert("Perfil blindado, Bro.");
+            document.getElementById('my-pic').src = me.pic + "?t=" + Date.now();
+            alert("Perfil actualizado.");
         }
     }
 
     async function loadUsers() {
         const res = await fetch('/get_users');
         const users = await res.json();
-        document.getElementById('u-list').innerHTML = users.filter(u => u !== me.username).map(u => 
-            `<div style="display:flex; justify-content:space-between; margin-bottom:10px; padding:10px; background:#2f3136; border-radius:5px;">
-                <span>👤 ${u}</span>
-                <button class="btn btn-chat" onclick="startChat('${u}')">Chat</button>
-            </div>`
-        ).join('') || "<p>No hay más bros registrados.</p>";
+        document.getElementById('u-list').innerHTML = users.filter(u => u.username !== me.username).map(u => `
+            <div style="display:flex; justify-content:space-between; margin-bottom:10px; background:#2f3136; padding:10px; border-radius:5px;">
+                <span><input type="checkbox" class="grp-check" value="${u.username}"> ${u.online ? '<span class="online-dot"></span>' : '<span class="offline-dot"></span>'} ${u.username}</span>
+                <button class="btn" style="width:auto; padding:5px 10px;" onclick="startChat('${u.username}')">Chat</button>
+            </div>`).join('');
     }
 
-    async function startChat(u) {
+    function startChat(u) {
         target = u;
-        document.getElementById('c-title').innerText = "🔒 Chat Privado con " + u;
-        const res = await fetch('/get_history', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({user: me.username, target: u})
-        });
-        const history = await res.json();
-        document.getElementById('chat-box').innerHTML = history.map(m => `<p><strong>${m.user}:</strong> ${m.msg}</p>`).join('');
-        socket.emit('join_private', {user: me.username, target: u});
-        showTab('chat');
+        document.getElementById('c-title').innerText = "Chat con " + u;
+        fetch('/get_history', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({user: me.username, target: u}) })
+            .then(r => r.json()).then(h => {
+                document.getElementById('chat-box').innerHTML = h.map(m => `<p><strong>${m.user}:</strong> ${m.msg}</p>`).join('');
+                socket.emit('join_private', {user: me.username, target: u});
+                showTab('chat');
+            });
     }
+
+    function sendTyping() {
+        socket.emit('typing', {user: me.username, target: target});
+    }
+
+    socket.on('is_typing', d => {
+        document.getElementById('typing-msg').innerText = d.user + " está escribiendo...";
+        clearTimeout(typingTimeout);
+        typingTimeout = setTimeout(() => document.getElementById('typing-msg').innerText = "", 2000);
+    });
 
     socket.on('new_msg', data => {
-        const box = document.getElementById('chat-box');
-        box.innerHTML += `<p><strong>${data.user}:</strong> ${data.msg}</p>`;
-        box.scrollTop = box.scrollHeight;
+        document.getElementById('chat-box').innerHTML += `<p><strong>${data.user}:</strong> ${data.msg}</p>`;
+        document.getElementById('chat-box').scrollTop = document.getElementById('chat-box').scrollHeight;
     });
 
     document.getElementById('m-in').onkeypress = (e) => {
-        if(e.key === 'Enter' && e.target.value.trim()) {
+        if(e.key === 'Enter') {
             socket.emit('send_msg', {user: me.username, target: target, msg: e.target.value});
             e.target.value = "";
         }
     };
 
+    async function uploadBrol() {
+        const fd = new FormData();
+        fd.append('file', document.getElementById('brol-file').files);
+        await fetch('/upload_brol', { method: 'POST', body: fd });
+        loadBrols();
+    }
+
     async function loadBrols() {
         const res = await fetch('/get_brols');
         const brols = await res.json();
-        document.getElementById('v-list').innerHTML = brols.map(v => 
-            `<div style="margin-bottom:30px; background:#202225; padding:20px; border-radius:10px;">
+        document.getElementById('v-list').innerHTML = brols.map(v => `
+            <div style="margin-bottom:20px; background:#202225; padding:15px; border-radius:10px;">
                 <p><strong>${v.title}</strong></p>
-                <video width="100%" controls src="${v.url}" style="border-radius:10px; max-height:450px;"></video>
-            </div>`
-        ).join('');
+                <video width="100%" controls src="${v.url}"></video>
+            </div>`).join('');
     }
 
     function showTab(t) {
@@ -168,6 +180,8 @@
         if(t === 'bros') loadUsers();
         if(t === 'brols') loadBrols();
     }
+
+    socket.on('status_update', () => loadUsers());
 </script>
 </body>
 </html>
