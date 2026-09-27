@@ -4,184 +4,192 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>BroNet - Arquitectura Anas</title>
+    <!-- Librerías y PWA [812, Historial] -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
     <link rel="manifest" href="/static/manifest.json">
     <link rel="icon" href="/static/logo.png" type="image/png">
+    
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #2c2f33; color: white; margin: 0; display: flex; height: 100vh; overflow: hidden; }
-        #sidebar { width: 220px; background-color: #23272a; padding: 20px; border-right: 1px solid #444; flex-shrink: 0; }
-        #main-content { flex-grow: 1; padding: 20px; display: flex; flex-direction: column; background-color: #36393f; }
-        .tab-button { display: block; width: 100%; padding: 12px; margin-bottom: 10px; background: #7289da; border: none; color: white; cursor: pointer; border-radius: 5px; text-align: left; font-weight: bold; }
-        .tab-button:hover { background: #5b6eae; }
-        .btn-user { background: #43b581; margin-top: 5px; font-size: 0.9em; }
-        #chat-area { flex-grow: 1; overflow-y: auto; background: #2f3136; padding: 15px; border-radius: 8px; margin-bottom: 10px; border: 1px solid #444; }
-        #message-input { width: 100%; padding: 15px; border-radius: 5px; border: none; background: #40444b; color: white; box-sizing: border-box; }
-        .hidden { display: none; }
-        .msg-line { margin: 5px 0; border-bottom: 1px solid #333; padding-bottom: 2px; }
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #2c2f33; color: white; margin: 0; display: flex; height: 100vh; overflow: hidden; }
+        #sidebar { width: 220px; background: #23272a; padding: 20px; border-right: 1px solid #444; flex-shrink: 0; }
+        #main-content { flex-grow: 1; padding: 20px; background: #36393f; display: flex; flex-direction: column; position: relative; }
+        
+        .tab-content { display: none; flex-grow: 1; overflow-y: auto; }
+        .active-tab { display: block; }
+        
+        .btn { background: #7289da; color: white; border: none; padding: 12px; border-radius: 5px; cursor: pointer; width: 100%; margin-bottom: 10px; font-weight: bold; }
+        .btn:hover { background: #5b6eae; }
+        .btn-user { background: #43b581; margin-top: 5px; font-size: 0.8em; width: auto; padding: 5px 10px; }
+        
+        #chat-area { background: #2f3136; height: 75%; overflow-y: auto; padding: 15px; border-radius: 8px; border: 1px solid #444; margin-bottom: 15px; }
+        input[type="text"], input[type="password"] { width: 100%; padding: 12px; background: #40444b; color: white; border: none; border-radius: 5px; box-sizing: border-box; margin-bottom: 10px; }
+        
+        .msg-line { margin: 8px 0; border-bottom: 1px solid #3e4147; padding-bottom: 5px; }
+        .hidden { display: none !important; }
+        
+        /* Overlay de Login [Historial] */
+        #login-overlay { position: fixed; inset: 0; background: #23272a; z-index: 1000; display: flex; flex-direction: column; align-items: center; justify-content: center; }
     </style>
 </head>
 <body>
 
-<!-- Pantalla de Login -->
-<div id="login-overlay" style="position:fixed; top:0; left:0; width:100%; height:100%; background:#23272a; z-index:1000; display:flex; flex-direction:column; align-items:center; justify-content:center;">
-    <h1 style="color: #7289da;">📡 Conectar a BroNet</h1>
-    <input type="text" id="user-login" placeholder="Tu nombre de Bro" style="padding:12px; margin:5px; border-radius:5px; border:none; width: 250px;">
-    <input type="password" id="pass-login" placeholder="Contraseña" style="padding:12px; margin:5px; border-radius:5px; border:none; width: 250px;">
-    <button onclick="doLogin()" style="padding:12px 25px; margin-top:15px; background:#43b581; color:white; border:none; border-radius:5px; cursor:pointer; font-weight:bold;">ENTRAR / REGISTRARSE</button>
+<!-- 1. Pantalla de Entrada (Paso A: Login JSON) -->
+<div id="login-overlay">
+    <h2 style="color: #7289da;">📡 Conectar a BroNet</h2>
+    <p>Introduce tus credenciales de Bro</p>
+    <input type="text" id="user-input" placeholder="Tu nombre de usuario" style="width: 260px;">
+    <input type="password" id="pass-input" placeholder="Tu contraseña" style="width: 260px;">
+    <button onclick="doLogin()" class="btn" style="width: 260px; background: #43b581;">ENTRAR / REGISTRARSE</button>
 </div>
 
+<!-- 2. Menú Lateral -->
 <div id="sidebar">
-    <h2 style="text-align:center;">BroNet</h2>
-    <hr style="border: 0.5px solid #444;">
-    <button class="tab-button" onclick="showTab('perfil')">👥 Lista de Bros</button>
-    <button class="tab-button" onclick="showTab('chat')">💬 Chat Actual</button>
-    <button class="tab-button" onclick="showTab
+    <h2 style="text-align: center;">BroNet</h2>
+    <hr style="border: 0.5px solid #444; margin-bottom: 20px;">
+    <button class="btn" onclick="showTab('perfil')">👥 Lista de Bros</button>
+    <button class="btn" onclick="showTab('chat')">💬 Chat Privado</button>
+    <button class="btn" onclick="showTab('brols')">🔥 Brols (Videos)</button>
 </div>
-async function showTab(tabName) {
-    document.querySelectorAll('.tab-content').forEach(tab => tab.classList.add('hidden'));
-    document.getElementById(tabName + '-tab').classList.remove('hidden');
 
-    if (tabName === 'brols') {
-        const response = await fetch('/get_brols');
-        const videos = await response.json();
-        const brolsDiv = document.getElementById('brols-tab');
-        brolsDiv.innerHTML = '<h3>🔥 Brols - Tendencias</h3>';
-        videos.forEach(v => {
-            brolsDiv.innerHTML += `
-                <div style="margin-bottom:20px; background:#2c2f33; padding:10px; border-radius:10px;">
-                    <p><strong>${v.title}</strong></p>
-                    <video width="100%" controls style="border-radius:5px;">
-                        <source src="${v.url}" type="video/mp4">
-                    </video>
-                </div>`;
-        });
-    }
-}
+<!-- 3. Contenido Principal -->
 <div id="main-content">
-    <!-- Pestaña Lista de Bros (Instagram Style) -->
-    <div id="perfil-tab" class="tab-content">
-        <h3>Bros en línea</h3>
-        <div id="users-list" style="background:#202225; padding:15px; border-radius:10px;">
-            <p>Buscando usuarios registrados...</p>
+    
+    <!-- Pestaña: Lista de Usuarios (Instagram Style) -->
+    <div id="perfil-tab" class="tab-content active-tab">
+        <h3>Bros Registrados</h3>
+        <div id="users-list" style="background: #202225; padding: 15px; border-radius: 10px; margin-bottom: 20px;">
+            <p>Sincronizando base de datos...</p>
+        </div>
+        
+        <hr style="border: 0.5px solid #444;">
+        
+        <h3>⚙️ Mi Configuración</h3>
+        <div style="background: #202225; padding: 15px; border-radius: 10px;">
+            <h4>Subir Archivo (Desintegrador de Virus activo)</h4>
+            <input type="file" id="file-selector">
+            <button class="btn btn-user" onclick="uploadAndScan()" style="display: block; margin-top: 10px;">Subir y Analizar</button>
+            <p id="virus-status" style="font-weight: bold; margin-top: 10px;"></p>
         </div>
     </div>
 
-    <!-- Pestaña Chat Privado/Grupo -->
-    <div id="chat-tab" class="tab-content hidden">
-        <h3 id="chat-title"># general</h3>
+    <!-- Pestaña: Chat Privado (Rooms) -->
+    <div id="chat-tab" class="tab-content">
+        <h3 id="chat-title">Selecciona un Bro para chatear</h3>
         <div id="chat-area">
-            <p class="msg-line"><strong>Root:</strong> Selecciona un bro de la lista para iniciar un túnel privado.</p>
+            <p class="msg-line"><i>Root: Esperando conexión segura...</i></p>
         </div>
-        <input type="text" id="message-input" placeholder="Escribe un mensaje privado...">
+        <input type="text" id="message-input" placeholder="Escribe un mensaje privado y pulsa Enter...">
     </div>
 
-    <!-- Pestaña Brols -->
-    <div id="brols-tab" class="tab-content hidden">
-        <h3>🔥 Brols - Tendencias</h3>
-        <div style="background:#202225; padding:20px; border-radius:10px; text-align:center;">
-            <p>Módulo "Desintegrador de Virus" activo para esta pestaña.</p>
-            <progress value="40" max="100"></progress>
+    <!-- Pestaña: Brols (Videos sin Copyright) -->
+    <div id="brols-tab" class="tab-content">
+        <h3>🔥 Brols - Tendencias Legales</h3>
+        <div id="videos-container">
+            <p>Cargando contenido dinámico...</p>
         </div>
     </div>
+
 </div>
 
 <script>
     const socket = io();
-    const chatArea = document.getElementById('chat-area');
-    const input = document.getElementById('message-input');
-    let currentUser = "";
-    let targetUser = ""; 
+    let myUser = "";
+    let chatTarget = "";
 
-    // 1. Lógica de Login y Registro Automático
+    // --- LÓGICA DE LOGIN ---
     async function doLogin() {
-        const user = document.getElementById('user-login').value;
-        const pass = document.getElementById('pass-login').value;
-        if (!user || !pass) return alert("Rellena los campos, bro");
+        const u = document.getElementById('user-input').value;
+        const p = document.getElementById('pass-input').value;
+        if (!u || !p) return alert("Rellena los campos, bro");
 
         const response = await fetch('/login', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({username: user, password: pass})
+            body: JSON.stringify({username: u, password: p})
         });
-        const resData = await response.json();
-        if(resData.status) {
-            currentUser = resData.user;
-            document.getElementById('login-overlay').style.display = 'none';
-            loadUsers(); // Al entrar, cargamos a los demás bros
+
+        if (response.ok) {
+            myUser = u;
+            document.getElementById('login-overlay').classList.add('hidden');
+            loadBros();
+        } else {
+            alert("Error en las credenciales.");
         }
     }
 
-    // 2. Cargar Lista de Bros (Para buscar a Juan, Jose, etc.)
-    async function loadUsers() {
-        const response = await fetch('/get_users');
-        const users = await response.json();
-        const listDiv = document.getElementById('users-list');
-        listDiv.innerHTML = "";
-        
-        users.forEach(u => {
-            if (u !== currentUser) {
-                listDiv.innerHTML += `
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                        <span>👤 ${u}</span>
-                        <button class="tab-button btn-user" onclick="startChat('${u}')">Chatear</button>
-                    </div>`;
-            }
-        });
+    // --- LISTA DE BROS ---
+    async function loadBros() {
+        const res = await fetch('/get_users');
+        const users = await res.json();
+        const list = document.getElementById('users-list');
+        list.innerHTML = users.filter(u => u !== myUser).map(u => `
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; border-bottom: 1px solid #333; padding-bottom: 5px;">
+                <span>👤 ${u}</span>
+                <button class="btn btn-user" onclick="startPrivateChat('${u}')">Chatear</button>
+            </div>
+        `).join('') || "<p>No hay más bros registrados aún.</p>";
     }
 
-    // 3. Iniciar Chat Privado (Rooms)
-    function startChat(user) {
-        targetUser = user;
-        document.getElementById('chat-title').innerText = `🔒 Chat con ${user}`;
-        chatArea.innerHTML = `<p class="msg-line"><i>Has iniciado una conexión segura con ${user}.</i></p>`;
-        socket.emit('join_private', {user: currentUser, target: user});
+    // --- CHAT PRIVADO (WebSockets Rooms) --- [Historial]
+    function startPrivateChat(target) {
+        chatTarget = target;
+        document.getElementById('chat-title').innerText = `🔒 Chat Privado con ${target}`;
+        document.getElementById('chat-area').innerHTML = `<p><i>Has entrado en un túnel seguro con ${target}.</i></p>`;
+        socket.emit('join_private', {user: myUser, target: target});
         showTab('chat');
     }
 
-    // 4. Escuchar Mensajes Privados
-    socket.on('new_message', (data) => {
+    socket.on('new_msg', (data) => {
         const p = document.createElement('p');
         p.className = 'msg-line';
         p.innerHTML = `<strong>${data.user}:</strong> ${data.msg}`;
-        chatArea.appendChild(p);
-        chatArea.scrollTop = chatArea.scrollHeight;
+        const area = document.getElementById('chat-area');
+        area.appendChild(p);
+        area.scrollTop = area.scrollHeight;
     });
 
-    // 5. Enviar Mensaje
-    input.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter' && input.value.trim() !== '') {
-            if (!targetUser) return alert("Primero selecciona un Bro de la lista.");
-            socket.emit('send_private_msg', {msg: input.value, user: currentUser, target: targetUser});
-            input.value = '';
+    document.getElementById('message-input').onkeypress = (e) => {
+        if (e.key === 'Enter' && e.target.value.trim() !== "") {
+            if (!chatTarget) return alert("Elige un bro primero.");
+            socket.emit('send_msg', {user: myUser, target: chatTarget, msg: e.target.value});
+            e.target.value = "";
         }
-    });
+    };
 
-    function showTab(tabName) {
-        document.querySelectorAll('.tab-content').forEach(tab => tab.classList.add('hidden'));
-        document.getElementById(tabName + '-tab').classList.remove('hidden');
+    // --- BROLS (Videos) ---
+    async function loadVideos() {
+        const res = await fetch('/get_brols');
+        const videos = await res.json();
+        document.getElementById('videos-container').innerHTML = videos.map(v => `
+            <div style="margin-bottom:20px; background:#202225; padding:15px; border-radius:10px;">
+                <p><strong>${v.title}</strong></p>
+                <video width="100%" controls style="border-radius:5px;" src="${v.url}"></video>
+            </div>
+        `).join('');
     }
 
-<!-- Dentro de perfil-tab -->
-<div style="margin-top:20px; background:#202225; padding:15px; border-radius:10px;">
-    <h4>Actualizar foto de perfil</h4>
-    <input type="file" id="file-upload" style="margin-bottom:10px;">
-    <button class="tab-button btn-user" onclick="uploadFile()">Subir y Escanear</button>
-    <p id="upload-status"></p>
-</div>
+    // --- DESINTEGRADOR DE VIRUS (Upload) --- [434, Historial]
+    async function uploadAndScan() {
+        const fileInput = document.getElementById('file-selector');
+        if (!fileInput.files) return alert("Selecciona un archivo primero.");
+        
+        const fd = new FormData();
+        fd.append('file', fileInput.files);
+        
+        document.getElementById('virus-status').innerText = "Escaneando archivo...";
+        
+        const res = await fetch('/upload_profile', { method: 'POST', body: fd });
+        const data = await res.json();
+        document.getElementById('virus-status').innerText = data.msg;
+    }
 
-<script>
-async function uploadFile() {
-    const fileInput = document.getElementById('file-upload');
-    const formData = new FormData();
-    formData.append('file', fileInput.files);
-
-    const response = await fetch('/upload_profile', {
-        method: 'POST',
-        body: formData
-    });
-    const result = await response.json();
-    document.getElementById('upload-status').innerText = result.msg;
-}
+    // --- NAVEGACIÓN ---
+    function showTab(tabId) {
+        document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active-tab'));
+        document.getElementById(tabId + '-tab').classList.add('active-tab');
+        if (tabId === 'perfil') loadBros();
+        if (tabId === 'brols') loadVideos();
+    }
 </script>
 
 </body>
