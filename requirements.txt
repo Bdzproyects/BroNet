@@ -2,5 +2,3 @@ flask
 flask-socketio
 Pillow
 requests
-gunicorn
-eventlet
