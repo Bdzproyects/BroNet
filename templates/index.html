@@ -5,12 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>BroNet - Arquitectura Anas</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <link rel="manifest" href="/static/manifest.json">
+    <link rel="icon" href="/static/logo.png" type="image/png">
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #2c2f33; color: white; margin: 0; display: flex; height: 100vh; overflow: hidden; }
-        #sidebar { width: 200px; background-color: #23272a; padding: 20px; border-right: 1px solid #444; flex-shrink: 0; }
+        #sidebar { width: 220px; background-color: #23272a; padding: 20px; border-right: 1px solid #444; flex-shrink: 0; }
         #main-content { flex-grow: 1; padding: 20px; display: flex; flex-direction: column; background-color: #36393f; }
         .tab-button { display: block; width: 100%; padding: 12px; margin-bottom: 10px; background: #7289da; border: none; color: white; cursor: pointer; border-radius: 5px; text-align: left; font-weight: bold; }
         .tab-button:hover { background: #5b6eae; }
+        .btn-user { background: #43b581; margin-top: 5px; font-size: 0.9em; }
         #chat-area { flex-grow: 1; overflow-y: auto; background: #2f3136; padding: 15px; border-radius: 8px; margin-bottom: 10px; border: 1px solid #444; }
         #message-input { width: 100%; padding: 15px; border-radius: 5px; border: none; background: #40444b; color: white; box-sizing: border-box; }
         .hidden { display: none; }
@@ -19,11 +22,10 @@
 </head>
 <body>
 
-<!-- Pantalla de Login (Paso A) -->
+<!-- Pantalla de Login -->
 <div id="login-overlay" style="position:fixed; top:0; left:0; width:100%; height:100%; background:#23272a; z-index:1000; display:flex; flex-direction:column; align-items:center; justify-content:center;">
     <h1 style="color: #7289da;">📡 Conectar a BroNet</h1>
-    <p>Introduce tus credenciales de Arquitecto</p>
-    <input type="text" id="user-login" placeholder="Usuario" style="padding:12px; margin:5px; border-radius:5px; border:none; width: 250px;">
+    <input type="text" id="user-login" placeholder="Tu nombre de Bro" style="padding:12px; margin:5px; border-radius:5px; border:none; width: 250px;">
     <input type="password" id="pass-login" placeholder="Contraseña" style="padding:12px; margin:5px; border-radius:5px; border:none; width: 250px;">
     <button onclick="doLogin()" style="padding:12px 25px; margin-top:15px; background:#43b581; color:white; border:none; border-radius:5px; cursor:pointer; font-weight:bold;">ENTRAR / REGISTRARSE</button>
 </div>
@@ -31,34 +33,36 @@
 <div id="sidebar">
     <h2 style="text-align:center;">BroNet</h2>
     <hr style="border: 0.5px solid #444;">
-    <button class="tab-button" onclick="showTab('chat')">💬 Chat Principal</button>
+    <button class="tab-button" onclick="showTab('perfil')">👥 Lista de Bros</button>
+    <button class="tab-button" onclick="showTab('chat')">💬 Chat Actual</button>
     <button class="tab-button" onclick="showTab('brols')">🔥 Brols (Videos)</button>
-    <button class="tab-button" onclick="showTab('perfil')">👤 Mi Perfil</button>
 </div>
 
 <div id="main-content">
-    <!-- Pestaña Chat -->
-    <div id="chat-tab" class="tab-content">
-        <h3># general</h3>
-        <div id="chat-area">
-            <p class="msg-line"><strong>Root:</strong> Sistema de broadcast activo. Esperando paquetes... [Historial]</p>
+    <!-- Pestaña Lista de Bros (Instagram Style) -->
+    <div id="perfil-tab" class="tab-content">
+        <h3>Bros en línea</h3>
+        <div id="users-list" style="background:#202225; padding:15px; border-radius:10px;">
+            <p>Buscando usuarios registrados...</p>
         </div>
-        <input type="text" id="message-input" placeholder="Escribe un mensaje y pulsa Enter...">
+    </div>
+
+    <!-- Pestaña Chat Privado/Grupo -->
+    <div id="chat-tab" class="tab-content hidden">
+        <h3 id="chat-title"># general</h3>
+        <div id="chat-area">
+            <p class="msg-line"><strong>Root:</strong> Selecciona un bro de la lista para iniciar un túnel privado.</p>
+        </div>
+        <input type="text" id="message-input" placeholder="Escribe un mensaje privado...">
     </div>
 
     <!-- Pestaña Brols -->
     <div id="brols-tab" class="tab-content hidden">
         <h3>🔥 Brols - Tendencias</h3>
         <div style="background:#202225; padding:20px; border-radius:10px; text-align:center;">
-            <p>Módulo de carga de videos cortos en desarrollo...</p>
-            <progress value="20" max="100"></progress>
+            <p>Módulo "Desintegrador de Virus" activo para esta pestaña.</p>
+            <progress value="40" max="100"></progress>
         </div>
-    </div>
-
-    <!-- Pestaña Perfil -->
-    <div id="perfil-tab" class="tab-content hidden">
-        <h3>👤 Perfil de Usuario</h3>
-        <div id="perfil-info"></div>
     </div>
 </div>
 
@@ -67,12 +71,12 @@
     const chatArea = document.getElementById('chat-area');
     const input = document.getElementById('message-input');
     let currentUser = "";
+    let targetUser = ""; 
 
-    // 1. Lógica de Login (POST Request) [1, 2]
+    // 1. Lógica de Login y Registro Automático
     async function doLogin() {
         const user = document.getElementById('user-login').value;
         const pass = document.getElementById('pass-login').value;
-        
         if (!user || !pass) return alert("Rellena los campos, bro");
 
         const response = await fetch('/login', {
@@ -81,16 +85,42 @@
             body: JSON.stringify({username: user, password: pass})
         });
         const resData = await response.json();
-        
         if(resData.status) {
             currentUser = resData.user;
             document.getElementById('login-overlay').style.display = 'none';
-            document.getElementById('perfil-info').innerHTML = `<h4>Arquitecto: ${currentUser}</h4>`;
+            loadUsers(); // Al entrar, cargamos a los demás bros
         }
     }
 
-    // 2. Escuchar mensajes (Broadcast) [Historial]
-    socket.on('message', (data) => {
+    // 2. Cargar Lista de Bros (Para buscar a Juan, Jose, etc.)
+    async function loadUsers() {
+        const response = await fetch('/get_users');
+        const users = await response.json();
+        const listDiv = document.getElementById('users-list');
+        listDiv.innerHTML = "";
+        
+        users.forEach(u => {
+            if (u !== currentUser) {
+                listDiv.innerHTML += `
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                        <span>👤 ${u}</span>
+                        <button class="tab-button btn-user" onclick="startChat('${u}')">Chatear</button>
+                    </div>`;
+            }
+        });
+    }
+
+    // 3. Iniciar Chat Privado (Rooms)
+    function startChat(user) {
+        targetUser = user;
+        document.getElementById('chat-title').innerText = `🔒 Chat con ${user}`;
+        chatArea.innerHTML = `<p class="msg-line"><i>Has iniciado una conexión segura con ${user}.</i></p>`;
+        socket.emit('join_private', {user: currentUser, target: user});
+        showTab('chat');
+    }
+
+    // 4. Escuchar Mensajes Privados
+    socket.on('new_message', (data) => {
         const p = document.createElement('p');
         p.className = 'msg-line';
         p.innerHTML = `<strong>${data.user}:</strong> ${data.msg}`;
@@ -98,15 +128,15 @@
         chatArea.scrollTop = chatArea.scrollHeight;
     });
 
-    // 3. Enviar mensaje
+    // 5. Enviar Mensaje
     input.addEventListener('keypress', (e) => {
         if (e.key === 'Enter' && input.value.trim() !== '') {
-            socket.emit('message', {msg: input.value, user: currentUser});
+            if (!targetUser) return alert("Primero selecciona un Bro de la lista.");
+            socket.emit('send_private_msg', {msg: input.value, user: currentUser, target: targetUser});
             input.value = '';
         }
     });
 
-    // 4. Gestión de Pestañas
     function showTab(tabName) {
         document.querySelectorAll('.tab-content').forEach(tab => tab.classList.add('hidden'));
         document.getElementById(tabName + '-tab').classList.remove('hidden');
