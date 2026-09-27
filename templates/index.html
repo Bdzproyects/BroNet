@@ -35,9 +35,28 @@
     <hr style="border: 0.5px solid #444;">
     <button class="tab-button" onclick="showTab('perfil')">👥 Lista de Bros</button>
     <button class="tab-button" onclick="showTab('chat')">💬 Chat Actual</button>
-    <button class="tab-button" onclick="showTab('brols')">🔥 Brols (Videos)</button>
+    <button class="tab-button" onclick="showTab
 </div>
+async function showTab(tabName) {
+    document.querySelectorAll('.tab-content').forEach(tab => tab.classList.add('hidden'));
+    document.getElementById(tabName + '-tab').classList.remove('hidden');
 
+    if (tabName === 'brols') {
+        const response = await fetch('/get_brols');
+        const videos = await response.json();
+        const brolsDiv = document.getElementById('brols-tab');
+        brolsDiv.innerHTML = '<h3>🔥 Brols - Tendencias</h3>';
+        videos.forEach(v => {
+            brolsDiv.innerHTML += `
+                <div style="margin-bottom:20px; background:#2c2f33; padding:10px; border-radius:10px;">
+                    <p><strong>${v.title}</strong></p>
+                    <video width="100%" controls style="border-radius:5px;">
+                        <source src="${v.url}" type="video/mp4">
+                    </video>
+                </div>`;
+        });
+    }
+}
 <div id="main-content">
     <!-- Pestaña Lista de Bros (Instagram Style) -->
     <div id="perfil-tab" class="tab-content">
