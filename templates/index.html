@@ -59,6 +59,32 @@
             input.value = '';
         }
     });
+    <script>
+    const socket = io();
+    const chatArea = document.getElementById('chat-area');
+    const input = document.getElementById('message-input');
+
+    // Escuchar mensajes del servidor y ponerlos en la pantalla
+    socket.on('message', (data) => {
+        const p = document.createElement('p');
+        p.innerHTML = `<strong>${data.user}:</strong> ${data.msg}`;
+        chatArea.appendChild(p);
+        chatArea.scrollTop = chatArea.scrollHeight; // Auto-scroll hacia abajo
+    });
+
+    // Enviar mensaje al pulsar Enter
+    input.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter' && input.value.trim() !== '') {
+            socket.emit('message', {msg: input.value, user: 'Anas'}); // Por ahora usuario fijo
+            input.value = '';
+        }
+    });
+
+    function showTab(tabName) {
+        document.getElementById('chat-tab').classList.add('hidden');
+        document.getElementById('brols-tab').classList.add('hidden');
+        document.getElementById(tabName + '-tab').classList.remove('hidden');
+    }
 </script>
 
 </body>
