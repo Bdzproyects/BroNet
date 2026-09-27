@@ -7,7 +7,7 @@ socketio = SocketIO(app)
 
 @app.route('/')
 def index():
-    return "Servidor BroNet en línea. ¡Listo para el código, Arquitecto Anas!"
+    return render_template('index.html')
 
 if __name__ == '__main__':
     # Esta línea es vital para que Railway funcione [Historial]
