@@ -2,3 +2,4 @@ flask
 flask-socketio
 Pillow
 requests
+eventlet
