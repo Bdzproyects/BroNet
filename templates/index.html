@@ -160,6 +160,28 @@ async function showTab(tabName) {
         document.querySelectorAll('.tab-content').forEach(tab => tab.classList.add('hidden'));
         document.getElementById(tabName + '-tab').classList.remove('hidden');
     }
+
+<!-- Dentro de perfil-tab -->
+<div style="margin-top:20px; background:#202225; padding:15px; border-radius:10px;">
+    <h4>Actualizar foto de perfil</h4>
+    <input type="file" id="file-upload" style="margin-bottom:10px;">
+    <button class="tab-button btn-user" onclick="uploadFile()">Subir y Escanear</button>
+    <p id="upload-status"></p>
+</div>
+
+<script>
+async function uploadFile() {
+    const fileInput = document.getElementById('file-upload');
+    const formData = new FormData();
+    formData.append('file', fileInput.files);
+
+    const response = await fetch('/upload_profile', {
+        method: 'POST',
+        body: formData
+    });
+    const result = await response.json();
+    document.getElementById('upload-status').innerText = result.msg;
+}
 </script>
 
 </body>
