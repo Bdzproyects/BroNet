@@ -89,3 +89,13 @@ if __name__ == '__main__':
     # Puerto dinámico vital para Railway [3, 4]
     port = int(os.environ.get('PORT', 8080))
     socketio.run(app, host='0.0.0.0', port=port)
+# --- MÓDULO DE BROLS (PASO A) ---
+@app.route('/get_brols', methods=['GET'])
+def get_brols():
+    # En el futuro, aquí usaremos 'requests' para conectar con YouTube o Pexels
+    # Por ahora, devolvemos una lista de videos de ejemplo sin copyright
+    videos = [
+        {"title": "Arquitectura Digital", "url": "https://www.w3schools.com/html/mov_bbb.mp4"},
+        {"title": "Ciberseguridad Pro", "url": "https://www.w3schools.com/html/horse.mp4"}
+    ]
+    return jsonify(videos)
