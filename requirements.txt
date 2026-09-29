@@ -1,5 +1,4 @@
-flask
-flask-socketio
-Pillow
-requests
+Flask
+Flask-SocketIO
 eventlet
+Werkzeug
