@@ -1,17 +1,16 @@
 import os
 import json
 import subprocess
-from flask import Flask, render_template, request, jsonify, url_for
+from flask import Flask, render_template, request, jsonify
 from flask_socketio import SocketIO, emit, join_room
 from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'bro-net-ultra-security-2026'
 
-# Configuración de carpetas [4]
+# Configuración de carpetas de subida
 UPLOAD_FOLDER = 'static/uploads/'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-# Asegurar que las carpetas existan al arrancar
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs('data/', exist_ok=True)
 
@@ -31,9 +30,10 @@ def load_data(path, default=[]):
 def save_data(path, data):
     with open(path, 'w', encoding='utf-8') as f: json.dump(data, f, indent=4)
 
-# --- RUTAS ---
+# --- RUTAS WEB ---
 @app.route('/')
-def index(): return render_template('index.html')
+def index(): 
+    return render_template('index.html')
 
 @app.route('/login', methods=['POST'])
 def login():
@@ -46,7 +46,6 @@ def login():
         if user_found['password'] == pwd: return jsonify({"status": "ok", "user": user_found})
         return jsonify({"status": "error", "msg": "Clave incorrecta"}), 401
     else:
-        # Validación de Gmail y Unicidad [5]
         if not email.lower().endswith("@gmail.com"):
             return jsonify({"status": "error", "msg": "Solo correos @gmail.com"}), 400
         if any(u['username'] == u_name for u in users):
@@ -67,7 +66,6 @@ def update_profile():
             u['bio'] = bio
             if 'file' in request.files:
                 file = request.files['file']
-                # Guardado seguro de imagen [6, 7]
                 filename = secure_filename(f"profile_{u_name}_{file.filename}")
                 path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
                 file.save(path)
@@ -76,13 +74,17 @@ def update_profile():
             return jsonify({"status": "ok", "user": u})
     return jsonify({"status": "error"}), 404
 
-@app.route('/upload_brol', methods=['POST'])
-def upload_brol():
-    if 'file' not in request.files: return jsonify({"msg": "Error"}), 400
-    file = request.files['file']
-    filename = secure_filename(f"brol_{file.filename}")
-    file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-    return jsonify({"status": "ok", "msg": "¡Brol en el aire!"})
+# --- NUEVA RUTA: SUBIDA DE AUDIOS DE VOZ ---
+@app.route('/upload_audio', methods=['POST'])
+def upload_audio():
+    if 'audio' not in request.files: 
+        return jsonify({"status": "error", "msg": "Sin archivo"}), 400
+    file = request.files['audio']
+    user = request.form.get('user', 'anonimo')
+    filename = secure_filename(f"audio_{user}_{file.filename}.webm")
+    path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+    file.save(path)
+    return jsonify({"status": "ok", "url": f"/static/uploads/{filename}"})
 
 @app.route('/get_brols', methods=['GET'])
 def get_brols():
@@ -101,7 +103,7 @@ def get_history():
     room = f"room_{min(data['user'], data['target'])}_{max(data['user'], data['target'])}"
     return jsonify([m for m in load_data(MSG_DB) if m['room'] == room])
 
-# --- SOCKETS: PRESENCIA Y ESCRITURA ---
+# --- SOCKETS: PRESENCIA Y CHAT EN TIEMPO REAL ---
 @socketio.on('set_identity')
 def set_identity(data):
     online_users[request.sid] = data['user']
@@ -129,3 +131,4 @@ def on_msg(data):
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
     socketio.run(app, host='0.0.0.0', port=port)
+
