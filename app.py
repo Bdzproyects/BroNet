@@ -1,6 +1,5 @@
 import os
 import json
-import time
 import subprocess
 from flask import Flask, render_template, request, jsonify
 from flask_socketio import SocketIO, emit, join_room, leave_room
@@ -9,19 +8,22 @@ from werkzeug.utils import secure_filename
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'bro-net-ultra-security-2026'
 
-# Carpetas de almacenamiento
+# --- CONFIGURACIÓN DE RUTAS Y CARPETAS ---
 UPLOAD_FOLDER = 'static/uploads/'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
+# Garantizamos que las carpetas existan en el sistema al arrancar [2]
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs('data/', exist_ok=True)
 
+# Asincronía con eventlet para soportar múltiples conexiones simultáneas
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
 
-# Bases de datos JSON
+# --- RUTAS DE BASES DE DATOS JSON ---
 USER_DB = 'data/users.json'
 MSG_DB = 'data/messages.json'
 
-# Mapeo de presencia en tiempo real (sid -> username)
+# Seguimiento de presencia en tiempo real (sid -> username)
 online_users = {}
 
 def load_data(path, default=[]):
@@ -57,6 +59,7 @@ def login():
             return jsonify({"status": "ok", "user": user_found})
         return jsonify({"status": "error", "msg": "Contraseña incorrecta"}), 401
     else:
+        # Validación estricta de dominio Gmail y unicidad
         if not email.lower().endswith("@gmail.com"):
             return jsonify({"status": "error", "msg": "Se requiere un correo @gmail.com para el registro"}), 400
         if any(u['username'] == u_name for u in users):
@@ -66,7 +69,7 @@ def login():
             "username": u_name,
             "email": email,
             "password": pwd,
-            "bio": "BroNet User",
+            "bio": "Arquitecto en BroNet",
             "pic": "/static/logo.png"
         }
         users.append(new_user)
@@ -78,6 +81,7 @@ def update_profile():
     u_name = request.form.get('username')
     bio = request.form.get('bio')
     users = load_data(USER_DB)
+    
     for u in users:
         if u['username'] == u_name:
             u['bio'] = bio
@@ -87,46 +91,51 @@ def update_profile():
                 path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
                 file.save(path)
                 
-                # Desintegrador de Virus (ClamAV)
+                # --- ESCANEO ANTIVIRUS (ClamAV) --- [3, 4]
                 try:
                     result = subprocess.run(['clamscan', path], capture_output=True, text=True)
                     if "Infected files: 0" not in result.stdout:
                         os.remove(path)
-                        return jsonify({"status": "error", "msg": "¡PELIGRO! Archivo borrado por detectar virus."}), 400
+                        return jsonify({"status": "error", "msg": "¡PELIGRO! Archivo desintegrado por contener un virus."}), 400
                 except FileNotFoundError:
                     pass
                 
-                u['pic'] = f"/static/uploads/{filename}" 
+                u['pic'] = f"/static/uploads/{filename}"
+                
             save_data(USER_DB, users)
             return jsonify({"status": "ok", "user": u})
-    return jsonify({"status": "error"}), 404
+            
+    return jsonify({"status": "error", "msg": "Usuario no encontrado"}), 404
 
-# RUTA SOLUCIONADA: Nombre de archivo único por milisegundos para evitar repeticiones de audio
 @app.route('/upload_audio', methods=['POST'])
 def upload_audio():
-    if 'audio' not in request.files: 
-        return jsonify({"status": "error", "msg": "Sin archivo"}), 400
+    if 'audio' not in request.files:
+        return jsonify({"status": "error", "msg": "No se recibió archivo de audio"}), 400
     file = request.files['audio']
     user = request.form.get('user', 'anonimo')
-    timestamp = int(time.time() * 1000)
-    filename = secure_filename(f"audio_{user}_{timestamp}.webm")
+    filename = secure_filename(file.filename)
     path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
     file.save(path)
     return jsonify({"status": "ok", "url": f"/static/uploads/{filename}"})
 
 @app.route('/upload_brol', methods=['POST'])
 def upload_brol():
-    if 'file' not in request.files: 
-        return jsonify({"msg": "Error"}), 400
+    if 'file' not in request.files:
+        return jsonify({"status": "error", "msg": "Sin archivo de video"}), 400
     file = request.files['file']
     filename = secure_filename(f"brol_{file.filename}")
-    file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-    return jsonify({"status": "ok", "msg": "¡Brol publicado!"})
+    path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+    file.save(path)
+    return jsonify({"status": "ok", "msg": "¡Brol publicado con éxito!"})
 
 @app.route('/get_brols', methods=['GET'])
 def get_brols():
-    videos = [{"title": f.split('_')[-1], "url": "/static/uploads/" + f} 
-              for f in os.listdir(app.config['UPLOAD_FOLDER']) if f.endswith(('.mp4', '.mov', '.webm'))]
+    # FILTRO MEJORADO: Exige que el archivo empiece por 'brol_' para no incluir audios de voz
+    videos = [
+        {"title": f.split('_')[-1], "url": f"/static/uploads/{f}"}
+        for f in os.listdir(app.config['UPLOAD_FOLDER'])
+        if f.startswith('brol_') and f.endswith(('.mp4', '.mov', '.webm'))
+    ]
     return jsonify(videos)
 
 @app.route('/get_users', methods=['GET'])
@@ -135,8 +144,8 @@ def get_users():
     active_names = list(online_users.values())
     return jsonify([
         {
-            "username": u['username'], 
-            "online": u['username'] in active_names, 
+            "username": u['username'],
+            "online": u['username'] in active_names,
             "pic": u['pic'],
             "bio": u.get('bio', '')
         } for u in users
@@ -146,9 +155,10 @@ def get_users():
 def get_history():
     data = request.json
     room = f"room_{min(data['user'], data['target'])}_{max(data['user'], data['target'])}"
-    return jsonify([m for m in load_data(MSG_DB) if m['room'] == room])
+    msgs = load_data(MSG_DB)
+    return jsonify([m for m in msgs if m['room'] == room])
 
-# --- SOCKETS: CHAT, PRESENCIA Y SEÑALIZACIÓN WEBRTC DE LLAMADAS ---
+# --- CONTROL DE SOCKETS (PRESENCIA Y CHAT PRIVADO) ---
 
 @socketio.on('set_identity')
 def set_identity(data):
@@ -180,7 +190,8 @@ def on_msg(data):
     save_data(MSG_DB, msgs)
     emit('new_msg', new_m, room=room)
 
-# MÓDULO DE SEÑALIZACIÓN DE LLAMADAS
+# --- SEÑALIZACIÓN WEBRTC PARA LLAMADAS EN TIEMPO REAL ---
+
 @socketio.on('call_user')
 def handle_call_user(data):
     room = f"room_{min(data['user'], data['target'])}_{max(data['user'], data['target'])}"
@@ -196,12 +207,6 @@ def handle_ice_candidate(data):
     room = f"room_{min(data['user'], data['target'])}_{max(data['user'], data['target'])}"
     emit('ice_candidate_received', {"candidate": data['candidate']}, room=room, include_self=False)
 
-@socketio.on('end_call')
-def handle_end_call(data):
-    room = f"room_{min(data['user'], data['target'])}_{max(data['user'], data['target'])}"
-    emit('call_ended', {"from": data['user']}, room=room, include_self=False)
-
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
     socketio.run(app, host='0.0.0.0', port=port)
-
