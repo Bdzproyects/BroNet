@@ -2,91 +2,127 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>BroNet - Arquitectura Anas</title>
+    <!-- Librerías de WebSockets y PWA -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
     <link rel="manifest" href="/static/manifest.json">
     <link rel="icon" href="/static/logo.png" type="image/png">
     <style>
-        body { font-family: 'Segoe UI', sans-serif; background: #2c2f33; color: white; margin: 0; display: flex; height: 100vh; overflow: hidden; }
-        #sidebar { width: 280px; background: #23272a; padding: 20px; border-right: 1px solid #444; flex-shrink: 0; }
-        #main { flex-grow: 1; padding: 20px; background: #36393f; display: flex; flex-direction: column; overflow-y: auto; }
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #2c2f33; color: white; margin: 0; display: flex; height: 100vh; overflow: hidden; }
+        #sidebar { width: 280px; background: #23272a; padding: 20px; border-right: 1px solid #444; flex-shrink: 0; display: flex; flex-direction: column; justify-content: space-between; }
+        #main { flex-grow: 1; padding: 20px; background: #36393f; display: flex; flex-direction: column; overflow-y: auto; position: relative; }
         .tab-content { display: none; }
         .active { display: block; }
-        .btn { background: #7289da; color: white; border: none; padding: 12px; border-radius: 5px; cursor: pointer; width: 100%; margin-bottom: 12px; font-weight: bold; }
-        .btn-audio { background: #e74c3c; width: auto; padding: 10px 15px; margin-bottom: 10px; }
-        #chat-box { background: #2f3136; height: 400px; overflow-y: auto; padding: 15px; border-radius: 8px; border: 1px solid #444; margin-bottom: 10px; }
+        .btn { background: #7289da; color: white; border: none; padding: 12px; border-radius: 5px; cursor: pointer; width: 100%; margin-bottom: 10px; font-weight: bold; transition: 0.2s; }
+        .btn:hover { background: #5b6eae; }
+        .btn-audio { background: #e74c3c; width: auto; padding: 10px 15px; }
+        
+        #chat-box { background: #2f3136; height: 420px; overflow-y: auto; padding: 15px; border-radius: 8px; border: 1px solid #444; margin-bottom: 10px; }
         input, textarea { width: 100%; padding: 12px; background: #40444b; color: white; border: none; border-radius: 5px; box-sizing: border-box; margin-bottom: 10px; }
         .profile-img { width: 70px; height: 70px; border-radius: 50%; object-fit: cover; border: 2px solid #7289da; }
-        .online-dot { width: 10px; height: 10px; background: #43b581; border-radius: 50%; display: inline-block; }
+        
+        /* Indicadores de Presencia en tiempo real */
+        .online-dot { width: 12px; height: 12px; background: #43b581; border-radius: 50%; display: inline-block; margin-right: 6px; border: 2px solid #23272a; }
+        .offline-dot { width: 12px; height: 12px; background: #f04747; border-radius: 50%; display: inline-block; margin-right: 6px; border: 2px solid #23272a; }
+        
         #login-overlay { position: fixed; inset: 0; background: #23272a; z-index: 1000; display: flex; flex-direction: column; align-items: center; justify-content: center; }
         .hidden { display: none !important; }
+        .user-card { display: flex; justify-content: space-between; align-items: center; background: #2f3136; padding: 12px; border-radius: 8px; margin-bottom: 10px; }
     </style>
 </head>
 <body>
 
+<!-- Pantalla de Login / Registro -->
 <div id="login-overlay">
-    <h2 style="color: #7289da;">📡 Sistema de Arquitectos BroNet</h2>
+    <h2 style="color: #7289da;">📡 Acceso a BroNet</h2>
     <div style="width: 320px;">
-        <input type="text" id="u-in" placeholder="Usuario">
-        <input type="text" id="e-in" placeholder="Email @gmail.com">
+        <input type="text" id="u-in" placeholder="Usuario o Correo">
+        <input type="text" id="e-in" placeholder="Correo @gmail.com (Solo para registro)">
         <input type="password" id="p-in" placeholder="Contraseña">
         <button onclick="login()" class="btn" style="background: #43b581;">ENTRAR / REGISTRARSE</button>
     </div>
 </div>
 
+<!-- Menú Lateral -->
 <div id="sidebar">
-    <div style="text-align:center; margin-bottom:20px; background:#2f3136; padding:10px; border-radius:10px;">
-        <img id="my-pic" src="/static/logo.png" class="profile-img">
-        <p id="my-name">...</p>
+    <div>
+        <div style="text-align:center; margin-bottom:20px; background:#2f3136; padding:10px; border-radius:10px;">
+            <img id="my-pic" src="/static/logo.png" class="profile-img">
+            <p id="my-name" style="font-weight:bold; margin-top:5px;">Cargando...</p>
+        </div>
+        <button class="btn" onclick="showTab('perfil')">👤 Mi Perfil</button>
+        <button class="btn" onclick="showTab('bros')">🔍 Buscar Bros</button>
+        <button class="btn" onclick="showTab('chat')">💬 Chat Privado</button>
+        <button class="btn" onclick="showTab('brols')">🔥 Brols (TikTok)</button>
     </div>
-    <button class="btn" onclick="showTab('perfil')">👤 Mi Perfil</button>
-    <button class="btn" onclick="showTab('bros')">👥 Lista de Bros</button>
-    <button class="btn" onclick="showTab('chat')">💬 Chat</button>
-    <button class="btn" onclick="showTab('brols')">🔥 Brols</button>
+    <div style="text-align: center; font-size: 0.8em; color: #777;">
+        BroNet Architecture © 2026
+    </div>
 </div>
 
+<!-- Panel Principal -->
 <div id="main">
+    
+    <!-- Pestaña 1: Configuración del Perfil -->
     <div id="perfil-tab" class="tab-content active">
         <h3>Editar Mi Perfil</h3>
-        <input type="file" id="file-pic">
-        <textarea id="bio-in" placeholder="Dile algo a tus bros..."></textarea>
-        <button class="btn" onclick="updateProfile()">Guardar Cambios</button>
+        <p>Sube tu foto de perfil y actualiza tu biografía para la comunidad.</p>
+        <input type="file" id="file-pic" accept="image/*">
+        <textarea id="bio-in" rows="4" placeholder="Escribe tu biografía aquí..."></textarea>
+        <button class="btn" onclick="updateProfile()" style="background:#43b581;">Guardar Cambios</button>
     </div>
 
+    <!-- Pestaña 2: Buscador Estilo Instagram -->
     <div id="bros-tab" class="tab-content">
-        <h3>Bros Registrados</h3>
-        <div id="u-list"></div>
+        <h3>🔍 Buscador de Bros</h3>
+        <input type="text" id="search-input" placeholder="Escribe el nombre de usuario de tu amigo..." oninput="filterBros()">
+        <div id="u-list">
+            <p style="color: #888;">Escribe en el buscador para encontrar amigos y chatear.</p>
+        </div>
     </div>
 
+    <!-- Pestaña 3: Chat Privado con Audio e Indicadores -->
     <div id="chat-tab" class="tab-content">
-        <h3 id="c-title">Selecciona un Bro</h3>
+        <h3 id="c-title">Selecciona un amigo del buscador</h3>
         <div id="chat-box"></div>
-        <p id="typing-msg" style="font-size:0.8em; color:#aaa;"></p>
+        <p id="typing-msg" style="font-size:0.8em; color:#aaa; height: 18px; margin: 0;"></p>
         
-        <div style="display: flex; gap: 10px; align-items: center;">
-            <input type="text" id="m-in" placeholder="Escribe un mensaje..." oninput="sendTyping()">
+        <div style="display: flex; gap: 10px; align-items: center; margin-top: 5px;">
+            <input type="text" id="m-in" placeholder="Escribe un mensaje privado..." oninput="sendTyping()">
             <button id="rec-btn" class="btn btn-audio" onclick="toggleRecording()">🎙️ Grabar Audio</button>
         </div>
     </div>
 
+    <!-- Pestaña 4: Brols (Feed de Videos) -->
     <div id="brols-tab" class="tab-content">
         <h3>🔥 Brols - Feed de Videos</h3>
         <input type="file" id="brol-file" accept="video/*">
-        <button class="btn" onclick="uploadBrol()">Subir Brol</button>
+        <button class="btn" onclick="uploadBrol()">Subir Brol al Feed</button>
+        <hr style="border: 0.5px solid #444; margin: 20px 0;">
         <div id="v-list"></div>
     </div>
+
 </div>
 
 <script>
     const socket = io();
-    let me = {}, target = "", tOut;
+    let me = {}, targetUser = null, tOut;
+    let allUsers = [];
     let mediaRecorder, audioChunks = [], isRecording = false;
 
+    // --- AUTENTICACIÓN ---
     async function login() {
+        const u = document.getElementById('u-in').value;
+        const e = document.getElementById('e-in').value;
+        const p = document.getElementById('p-in').value;
+        
+        if(!u || !p) return alert("Por favor rellenar usuario y contraseña.");
+
         const res = await fetch('/login', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({username: document.getElementById('u-in').value, email: document.getElementById('e-in').value, password: document.getElementById('p-in').value})
+            body: JSON.stringify({username: u, email: e, password: p})
         });
         const data = await res.json();
         if(res.ok) {
@@ -94,50 +130,119 @@
             document.getElementById('login-overlay').classList.add('hidden');
             document.getElementById('my-name').innerText = me.username;
             document.getElementById('my-pic').src = me.pic;
+            document.getElementById('bio-in').value = me.bio || "";
             socket.emit('set_identity', {user: me.username});
-            loadUsers();
-        } else alert(data.msg);
+            fetchUsersList();
+        } else {
+            alert(data.msg);
+        }
     }
 
+    // --- ACTUALIZAR PERFIL ---
     async function updateProfile() {
         const fd = new FormData();
         fd.append('username', me.username);
         fd.append('bio', document.getElementById('bio-in').value);
-        if(document.getElementById('file-pic').files) fd.append('file', document.getElementById('file-pic').files);
+        const fileInput = document.getElementById('file-pic');
+        if(fileInput.files.length > 0) {
+            fd.append('file', fileInput.files);
+        }
         const res = await fetch('/update_profile', { method: 'POST', body: fd });
         const data = await res.json();
         if(res.ok) {
             me = data.user;
             document.getElementById('my-pic').src = me.pic + "?t=" + Date.now();
-            alert("Perfil actualizado.");
+            alert("Perfil actualizado correctamente.");
+        } else {
+            alert(data.msg || "Error al actualizar perfil.");
         }
     }
 
-    async function loadUsers() {
+    // --- BUSCADOR E INDICADORES (INSTAGRAM STYLE) ---
+    async function fetchUsersList() {
         const res = await fetch('/get_users');
-        const users = await res.json();
-        document.getElementById('u-list').innerHTML = users.filter(u => u.username !== me.username).map(u => `
-            <div style="display:flex; justify-content:space-between; margin-bottom:10px; background:#2f3136; padding:10px; border-radius:5px;">
-                <span>${u.online ? '<span class="online-dot"></span>' : ''} 👤 ${u.username}</span>
-                <button class="btn" style="width:auto; padding:5px 10px;" onclick="startChat('${u.username}')">Chatear</button>
-            </div>`).join('');
+        allUsers = await res.json();
+        filterBros();
+        updateChatHeaderStatus();
     }
 
-    function startChat(u) {
-        target = u;
-        document.getElementById('c-title').innerText = "Chat con " + u;
-        fetch('/get_history', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({user: me.username, target: u}) })
-            .then(r => r.json()).then(h => {
-                document.getElementById('chat-box').innerHTML = h.map(m => `<p><strong>${m.user}:</strong> ${m.msg}</p>`).join('');
-                socket.emit('join_private', {user: me.username, target: u});
-                showTab('chat');
-            });
+    function filterBros() {
+        const query = document.getElementById('search-input').value.trim().toLowerCase();
+        const listDiv = document.getElementById('u-list');
+        
+        if (query === "") {
+            listDiv.innerHTML = `<p style="color: #888;">Escribe el nombre de usuario de tu amigo para buscarlo.</p>`;
+            return;
+        }
+
+        const matches = allUsers.filter(u => u.username.toLowerCase().includes(query) && u.username !== me.username);
+        
+        if (matches.length === 0) {
+            listDiv.innerHTML = `<p style="color: #e74c3c;">No se encontró ningún Bro con el usuario "${query}".</p>`;
+            return;
+        }
+
+        listDiv.innerHTML = matches.map(u => `
+            <div class="user-card">
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <img src="${u.pic}" style="width:40px; height:40px; border-radius:50%; object-fit:cover;">
+                    <div>
+                        <strong>${u.username}</strong>
+                        <br>
+                        <span style="font-size:0.8em; color:#aaa;">
+                            ${u.online ? '<span class="online-dot"></span> En línea' : '<span class="offline-dot"></span> Desconectado'}
+                        </span>
+                    </div>
+                </div>
+                <button class="btn" style="width:auto; padding:6px 14px;" onclick="startChat('${u.username}')">Chatear</button>
+            </div>
+        `).join('');
     }
 
-    // --- LÓGICA DE GRABACIÓN DE NOTAS DE VOZ ---
+    // --- CHATS Y HISTORIAL ---
+    function startChat(username) {
+        const uObj = allUsers.find(u => u.username === username) || { username: username, online: false };
+        targetUser = uObj;
+        updateChatHeaderStatus();
+
+        fetch('/get_history', { 
+            method: 'POST', 
+            headers: {'Content-Type': 'application/json'}, 
+            body: JSON.stringify({user: me.username, target: username}) 
+        })
+        .then(r => r.json())
+        .then(history => {
+            document.getElementById('chat-box').innerHTML = history.map(m => `<p><strong>${m.user}:</strong> ${m.msg}</p>`).join('');
+            document.getElementById('chat-box').scrollTop = document.getElementById('chat-box').scrollHeight;
+            socket.emit('join_private', {user: me.username, target: username});
+            showTab('chat');
+        });
+    }
+
+    function updateChatHeaderStatus() {
+        if (!targetUser) return;
+        const currentData = allUsers.find(u => u.username === targetUser.username);
+        const isOnline = currentData ? currentData.online : false;
+        
+        const statusDot = isOnline 
+            ? '<span class="online-dot" title="En línea"></span>' 
+            : '<span class="offline-dot" title="Desconectado"></span>';
+        
+        const statusText = isOnline ? 'En línea' : 'Desconectado';
+
+        document.getElementById('c-title').innerHTML = `
+            <div style="display:flex; align-items:center; gap:8px;">
+                ${statusDot}
+                <span>Chat con <strong>${targetUser.username}</strong></span>
+                <span style="font-size:0.75em; color:#aaa; font-weight:normal;">(${statusText})</span>
+            </div>
+        `;
+    }
+
+    // --- GRABADORA DE VOZ (MICROFONOS/AUDIOS) ---
     async function toggleRecording() {
         const btn = document.getElementById('rec-btn');
-        if (!target) return alert("Selecciona un Bro primero.");
+        if (!targetUser) return alert("Selecciona un amigo del buscador primero.");
 
         if (!isRecording) {
             try {
@@ -156,7 +261,7 @@
                     const data = await res.json();
                     if(res.ok) {
                         const audioMsg = `<audio controls src="${data.url}"></audio>`;
-                        socket.emit('send_msg', {user: me.username, target: target, msg: audioMsg});
+                        socket.emit('send_msg', {user: me.username, target: targetUser.username, msg: audioMsg});
                     }
                 };
 
@@ -165,7 +270,7 @@
                 btn.innerText = "🛑 Detener y Enviar";
                 btn.style.background = "#2ecc71";
             } catch (err) {
-                alert("Error al acceder al micrófono. Verifica los permisos de tu navegador.");
+                alert("Error al acceder al micrófono. Asegúrate de otorgar permisos en el navegador.");
             }
         } else {
             mediaRecorder.stop();
@@ -175,7 +280,10 @@
         }
     }
 
-    function sendTyping() { socket.emit('typing', {user: me.username, target: target}); }
+    // --- EVENTOS WEBSOCKETS ---
+    function sendTyping() { 
+        if (targetUser) socket.emit('typing', {user: me.username, target: targetUser.username}); 
+    }
 
     socket.on('is_typing', d => {
         document.getElementById('typing-msg').innerText = d.user + " está escribiendo...";
@@ -190,37 +298,53 @@
     });
 
     document.getElementById('m-in').onkeypress = (e) => {
-        if(e.key === 'Enter') {
-            socket.emit('send_msg', {user: me.username, target: target, msg: e.target.value});
+        if(e.key === 'Enter' && e.target.value.trim() !== "") {
+            if (!targetUser) return alert("Selecciona un amigo primero.");
+            socket.emit('send_msg', {user: me.username, target: targetUser.username, msg: e.target.value});
             e.target.value = "";
         }
     };
 
+    socket.on('status_update', () => {
+        fetchUsersList();
+    });
+
+    // --- BROLS (VIDEOS) ---
     async function uploadBrol() {
+        const fileInput = document.getElementById('brol-file');
+        if (fileInput.files.length === 0) return alert("Selecciona un archivo de video.");
         const fd = new FormData();
-        fd.append('file', document.getElementById('brol-file').files);
+        fd.append('file', fileInput.files);
         await fetch('/upload_brol', { method: 'POST', body: fd });
+        fileInput.value = "";
         loadBrols();
     }
 
     async function loadBrols() {
         const res = await fetch('/get_brols');
         const brols = await res.json();
-        document.getElementById('v-list').innerHTML = brols.map(v => `
+        const listDiv = document.getElementById('v-list');
+        if (brols.length === 0) {
+            listDiv.innerHTML = `<p style="color: #888;">No hay videos publicados aún. ¡Sé el primero en subir un Brol!</p>`;
+            return;
+        }
+        listDiv.innerHTML = brols.map(v => `
             <div style="margin-bottom:20px; background:#202225; padding:15px; border-radius:10px;">
                 <p><strong>Brol: ${v.title}</strong></p>
-                <video width="100%" controls src="${v.url}"></video>
-            </div>`).join('');
+                <video width="100%" controls src="${v.url}" style="border-radius:8px; max-height:450px;"></video>
+            </div>
+        `).join('');
     }
 
+    // --- NAVEGACIÓN ENTRE PESTAÑAS ---
     function showTab(t) {
         document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
         document.getElementById(t + '-tab').classList.add('active');
-        if(t === 'bros') loadUsers();
+        if(t === 'bros') fetchUsersList();
         if(t === 'brols') loadBrols();
     }
-
-    socket.on('status_update', () => loadUsers());
 </script>
+
 </body>
 </html>
+
